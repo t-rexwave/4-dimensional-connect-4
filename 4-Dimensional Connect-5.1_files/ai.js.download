@@ -1,0 +1,104 @@
+function AI(game, id) {
+	this.playerid = id;
+	this.depth = 3;
+	this.game = game;
+}
+AI.prototype.forAllMoves = function(player, f) {
+	/* For each empty space, makes a move, calls the callback, and then
+	 * undoes the move. The callback can return true to bail out of the
+	 * loop early. 
+	 */
+	var data = this.game.cellsOrderedByValue;
+	for(var i = 0; i < data.length; i++) {
+		var cell = data[i];
+		if(cell.value == null) {
+			cell.value = player;
+			var done = f.call(this, cell);
+			cell.value = null;
+			if(done) return;
+		}
+	}
+}
+AI.prototype.alphabeta = function(depth, alpha, beta, player, isFirst) {
+	/* I have no idea what I'm doing
+	 * Some form of miniminiminimax alpha/beta pruning, copied from
+	 * wikipedia
+	 */
+	var nextPlayer = (player + 1) % this.game.playerCount;
+	var status = this.boardStatus()
+	if(depth == 0 || status.isComplete)
+		return status.score;
+	else if(player == this.playerid) {
+		this.forAllMoves(player, function(cell) {
+			var newAlpha = this.alphabeta(depth-1, alpha, beta, nextPlayer)
+			if(isFirst && !this.bestMove) this.bestMove = cell;
+
+			if(newAlpha > alpha) {
+				alpha = newAlpha;
+				if(isFirst) this.bestMove = cell;
+			}
+			if(beta <= alpha)
+			 	return true; // Beta cut-off
+		});
+		return alpha;
+	}
+	else {
+		this.forAllMoves(player, function() {
+			beta = Math.min(
+				beta,
+				this.alphabeta(depth-1, alpha, beta, nextPlayer)
+			)
+			if(beta <= alpha)
+			 	return true; // Alpha cut-off
+		});
+		return beta;
+	}
+}
+AI.prototype.findMove = function(depth) {
+	depth = depth || this.depth;
+	this.bestMove = null;
+	this.alphabeta(depth, -Infinity, +Infinity, this.playerid, true);
+	return this.bestMove;
+}
+AI.prototype.makeMove = function() {
+	this.findMove().setValue(this.playerid);
+}
+AI.prototype.boardStatus = function() {
+	/* Returns a score for the current game state. A large number means the
+	 * AI is in a better position. For multiplayer games, this will be
+	 * negative most of the time.
+	 *
+	 * Value become meaningless after a game has multiple wins
+	 */
+	var scores = 0;
+	var isComplete = true;
+	for(var i = 0; i < this.game.winningLines.length; i++) {
+		var line = this.game.winningLines[i];
+
+		var seen = null;
+		var count = 0;
+		var isSingular = true;
+		for(var j = 0; j < line.length; j++) {
+			var cell = line[j];
+			if(cell.value == null) {
+				isComplete = false;
+			}
+			else if(seen == cell.value) {
+				count++;
+			}
+			else if(seen == null) {
+				count++;
+				seen = cell.value;
+			}
+			else isSingular = false;
+		};
+		if(isSingular && seen != null) {
+			var sign = seen == this.playerid ? 1 : -1;
+			if(count == this.game.size)
+				return {score: sign*Infinity, isComplete: true};
+
+			scores += sign*count*count*count;
+		}
+	}
+	return {score: scores, isComplete: isComplete};
+}

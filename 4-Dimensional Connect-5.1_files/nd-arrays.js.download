@@ -1,0 +1,21 @@
+function Array2D(size) {
+	this.size = size;
+	this.data = new Array(size*size);
+	this.get = function(w, x) {
+		return this.data[w + x*size];
+	};
+	this.set = function(w, x, value) {
+		this.data[w + x*size] = value;
+	};
+}
+
+function Array4D(size) {
+	this.size = size;
+	this.data = new Array(size*size*size*size);
+	this.get = function(p) {
+		return this.data[p[0] + p[1]*size + p[2]*size*size + p[3]*size*size*size];
+	};
+	this.set = function(p, value) {
+		this.data[p[0] + p[1]*size + p[2]*size*size + p[3]*size*size*size] = value;
+	};
+}

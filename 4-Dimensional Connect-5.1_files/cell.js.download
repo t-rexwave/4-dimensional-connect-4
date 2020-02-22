@@ -1,0 +1,16 @@
+function Cell(location) {
+	this.value = null;
+	this.elem = null;
+	this.location = location || [];
+}
+Cell.prototype.bindTo = function(elem) {
+	this.elem = elem
+};
+Cell.prototype.setValue = function(value) {
+	this.value = value;
+	this.updateColor(false);
+};
+Cell.prototype.updateColor = function(highlight) { };
+Cell.prototype.toString = function() {
+	return '<Cell at [' + this.location.join(',') + '] = ' + this.value + '>';
+};

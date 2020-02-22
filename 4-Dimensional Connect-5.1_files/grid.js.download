@@ -1,0 +1,202 @@
+function Grid(size, playerCount) {
+	Array4D.call(this, size);
+	this.playerCount = playerCount;
+
+	//Fill the array with cell objects
+	for(var w = 0; w < size; w++)
+	for(var x = 0; x < size; x++)
+	for(var y = 0; y < size; y++)
+	for(var z = 0; z < size; z++) {
+		var loc = [w, x, y, z];
+		this.set(loc, new Cell(loc));
+	}
+
+
+	function makeGrid(size, cellCallback) {
+		/* Builds a single nxn grid */
+		cellCallback = cellCallback || function () {};
+		var root = $('<table>');
+		for(var x = 0; x < size; x++) {
+			var row = $('<tr>');
+			row.appendTo(root);
+			for(var y = 0; y < size; y++) {
+				var cell = $('<td>');
+				cell.appendTo(row);
+				cellCallback.call(cell, x, y);
+			}
+		}
+		return root;
+	};
+	this.draw = function(cellCallback) {
+		/* Draw the grid to the document, invoking `cellCallback` on
+		 * each cell
+		 */
+		var that = this;
+		return makeGrid(that.size, function(w, x) {
+			this.append(makeGrid(that.size, function(y, z) {
+				var cell = that.get([w, x, y, z]);
+				cell.bindTo(this);
+				cellCallback.call(cell);
+			}));
+		});
+	};
+	// expected count of each type:
+	//   4-space: 2^3 * n^0 * 4C4
+	//   3-space: 2^2 * n^1 * 4C3
+	//   2-space: 2^1 * n^2 * 4C2
+	//   1-space: 2^0 * n^3 * 4C1
+	// total:
+	//   4*n*n*n + 12*n*n + 16*n + 8
+	// we actually get:
+	//   4*n*n*n + 18*n*n + 28*n + 15 (oops!)
+	this.winningLines = (function() {
+		if(size == 1) return [[this.get([0, 0, 0, 0])]];
+		var validCoordSets = (function() {
+			var a = [];
+
+			//Build diagonals
+			var diagonal = [];
+			for(var i = 0; i < size; i++) {
+				diagonal.push(i);
+			}
+
+			a.push(diagonal);
+			a.push(diagonal.slice().reverse());
+
+
+			for(var i = 0; i < size; i++) {
+				var straight = [];
+				for(var j = 0; j < size; j++) {
+					straight.push(i);
+				}
+				a.push(straight);
+			}
+			return a;
+		})();
+
+
+		var n = validCoordSets.length;
+		console.log(validCoordSets);
+
+		var a = [];
+		var self = this;
+
+		var addLine = function(w, x, y, z) {
+			var line = [];
+			for(var l = 0; l < size; l++) {
+				var cell = self.get([w[l], x[l], y[l], z[l]]);
+				if(!cell)
+					console.error("Help!");
+
+				line.push(cell);
+			}
+			a.push(line);
+		}
+
+		// (n+2)^3
+		var w = validCoordSets[0];
+		for(var i = 0; i < n; i++)
+		for(var j = 0; j < n; j++)
+		for(var k = 0; k < n; k++) {
+			var x = validCoordSets[i];
+			var y = validCoordSets[j];
+			var z = validCoordSets[k];
+			addLine(w, x, y, z);
+		}
+
+		// (n+2)^2 * n
+		var x = validCoordSets[0];
+		for(var i = 2; i < n; i++)
+		for(var j = 0; j < n; j++)
+		for(var k = 0; k < n; k++) {
+			var w = validCoordSets[i];
+			var y = validCoordSets[j];
+			var z = validCoordSets[k];
+			addLine(w, x, y, z);
+		}
+
+		// (n+2) * n^2
+		var y = validCoordSets[0];
+		for(var i = 2; i < n; i++)
+		for(var j = 2; j < n; j++)
+		for(var k = 0; k < n; k++) {
+			var w = validCoordSets[i];
+			var x = validCoordSets[j];
+			var z = validCoordSets[k];
+			addLine(w, x, y, z);
+		}
+
+		// n^3
+		var z = validCoordSets[0];
+		for(var i = 2; i < n; i++)
+		for(var j = 2; j < n; j++)
+		for(var k = 2; k < n; k++) {
+			var w = validCoordSets[i];
+			var x = validCoordSets[j];
+			var y = validCoordSets[k];
+			addLine(w, x, y, z);
+		}
+		
+		return a;
+	}).call(this);
+
+	this.cellsOrderedByValue = (function(self) {
+		// Decorate/sort/undecorate
+		var mapped = self.data.map(function(cell) {
+			var count = 0;
+			for(var i = 0; i < self.winningLines.length; i++) {
+				var line = self.winningLines[i];
+				for(var j = 0; j < line.length; j++) {
+					if(line[j] == cell) {
+						count++;
+						break;
+					}
+				}
+			}
+			return [count, cell]
+		});
+		mapped = mapped.sort(function(a, b){
+			if(b[0] < a[0]) return -1;
+			if(b[0] > a[0]) return 1;
+			return 0;
+		});
+		mapped = mapped.map(function(d) { return d[1]; });
+		return mapped;
+	})(this);
+};
+Grid.prototype.getWins = function() {
+	/* Returns all lines that contain a win */
+	return this.winningLines.filter(function(line) {
+		var lastValue = line[0].value;
+		
+		if(lastValue == null)
+			return false;
+
+		for(var i = 1; i < line.length; i++)
+			if(lastValue != line[i].value)
+				return false;
+
+		return true;
+	});
+}
+Grid.prototype.transform = function(transformer) {
+	/* Transforms the grid. Takes a transforming function f such
+	 * that f(int, int, int, int) -> [int, int, int, int]
+	 */
+	var rotated = [];
+	this.forEach(function(cell, loc) {
+		rotated.push({
+			value: cell.value,
+			loc: transformer.apply(null, loc)
+		});
+	});
+	rotated.forEach(function(data) {
+		this.get(data.loc).setValue(data.value);
+	}, this);
+}
+//4D array accessors
+Grid.prototype.forEach = function(callback, context) {
+	this.data.forEach(function(cell) {
+		callback.call(context, cell, cell.location)
+	}, this);
+}
